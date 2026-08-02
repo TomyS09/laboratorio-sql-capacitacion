@@ -1,0 +1,17 @@
+{
+  "version_paquete": "2.0",
+  "fecha": "2026-08-02",
+  "motor_web": "DuckDB-Wasm",
+  "paquete_duckdb_wasm": "1.32.0",
+  "hosting_sugerido": "GitHub Pages",
+  "registros": {
+    "productos": 3000,
+    "sucursales": 400,
+    "movimientos": 250000
+  },
+  "archivos_datos": {
+    "sucursales.csv.gz": 3782,
+    "productos.csv.gz": 41010,
+    "movimientos.csv.gz": 5044807
+  }
+}

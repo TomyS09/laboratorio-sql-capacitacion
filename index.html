@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Laboratorio web para el curso SQL básico para análisis de datos.">
+  <meta name="theme-color" content="#14385f">
+  <title>Laboratorio SQL | Capacitación</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark" aria-hidden="true">F</div>
+    <div>
+      <p class="eyebrow">Laboratorio de capacitación</p>
+      <h1>SQL básico para análisis de datos</h1>
+      <p class="subtitle">Consultas con sintaxis compatible con Apache Impala</p>
+    </div>
+    <div class="engine-chip" id="engineChip">Inicializando…</div>
+  </header>
+
+  <main class="workspace">
+    <aside class="sidebar" aria-label="Explorador de tablas">
+      <section class="panel intro-panel">
+        <h2>Entorno</h2>
+        <p>Cada participante trabaja en una base temporal e independiente dentro de su navegador.</p>
+        <div class="status-box" id="statusBox" role="status" aria-live="polite">
+          <span class="spinner" id="spinner"></span>
+          <span id="statusText">Preparando motor SQL…</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Tablas disponibles</h2>
+          <button class="icon-button" id="refreshSchemaBtn" title="Actualizar explorador" disabled>↻</button>
+        </div>
+        <div id="schemaExplorer" class="schema-explorer" aria-live="polite">
+          <p class="muted">Las tablas aparecerán cuando termine la carga.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Ejemplos por sesión</h2>
+        <div class="example-list" id="exampleList"></div>
+      </section>
+
+      <section class="panel shortcut-panel">
+        <h2>Atajos</h2>
+        <p><kbd>Ctrl</kbd> + <kbd>Enter</kbd> Ejecutar</p>
+        <p><kbd>Tab</kbd> Insertar sangría</p>
+      </section>
+    </aside>
+
+    <section class="main-column">
+      <section class="editor-card">
+        <div class="card-toolbar">
+          <div>
+            <p class="section-label">Editor SQL</p>
+            <p class="toolbar-note">Solo se permiten consultas de lectura.</p>
+          </div>
+          <div class="button-row">
+            <button class="button secondary" id="clearBtn">Limpiar</button>
+            <button class="button secondary" id="downloadSqlBtn">Descargar SQL</button>
+            <button class="button primary" id="runBtn" disabled>▶ Ejecutar</button>
+          </div>
+        </div>
+        <label class="sr-only" for="sqlEditor">Consulta SQL</label>
+        <textarea id="sqlEditor" spellcheck="false" autocomplete="off">SELECT
+    codigo_producto,
+    descripcion_producto,
+    categoria,
+    precio_unitario
+FROM capacitacion_sql.productos
+WHERE estado_producto = 'ACTIVO'
+ORDER BY precio_unitario DESC
+LIMIT 10;</textarea>
+        <div class="editor-footer">
+          <span id="editorInfo">0 líneas</span>
+          <button class="link-button" id="resetLabBtn" disabled>Restablecer laboratorio</button>
+        </div>
+      </section>
+
+      <section class="message-card hidden" id="messageCard" role="alert">
+        <strong id="messageTitle"></strong>
+        <pre id="messageBody"></pre>
+      </section>
+
+      <section class="results-card">
+        <div class="card-toolbar results-toolbar">
+          <div>
+            <p class="section-label">Resultados</p>
+            <p class="toolbar-note" id="resultSummary">Ejecuta una consulta para ver los resultados.</p>
+          </div>
+          <div class="button-row">
+            <label class="row-limit-label">
+              Mostrar
+              <select id="rowLimitSelect">
+                <option value="100">100 filas</option>
+                <option value="500" selected>500 filas</option>
+                <option value="1000">1.000 filas</option>
+              </select>
+            </label>
+            <button class="button secondary" id="exportCsvBtn" disabled>Exportar CSV</button>
+          </div>
+        </div>
+        <div class="table-wrap" id="tableWrap">
+          <div class="empty-state">
+            <div class="empty-icon">⌁</div>
+            <p>El resultado de la consulta se mostrará aquí.</p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer-note">
+        Datos ficticios para capacitación. El motor se ejecuta localmente en el navegador y no envía las consultas a una base corporativa.
+      </footer>
+    </section>
+  </main>
+
+  <dialog id="resetDialog">
+    <form method="dialog">
+      <h2>Restablecer laboratorio</h2>
+      <p>Se volverán a cargar las tres tablas y se perderán los cambios realizados durante esta sesión.</p>
+      <div class="dialog-actions">
+        <button class="button secondary" value="cancel">Cancelar</button>
+        <button class="button danger" id="confirmResetBtn" value="confirm">Restablecer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

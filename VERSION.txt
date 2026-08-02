@@ -1,0 +1,3 @@
+Laboratorio SQL en línea
+Versión 2.0
+Fecha: 2026-08-02

@@ -1,0 +1,25 @@
+{
+  "semilla": 20260802,
+  "registros": {
+    "productos": 3000,
+    "sucursales": 400,
+    "movimientos": 250000
+  },
+  "calidad_controlada": {
+    "productos_laboratorio_null": 90,
+    "productos_laboratorio_vacio_o_espacios": 90,
+    "productos_precio_null": 30,
+    "productos_stock_null": 60,
+    "productos_stock_cero": 300,
+    "movimientos_sin_producto": 1992,
+    "movimientos_sin_sucursal": 1282,
+    "productos_sin_movimientos": 150,
+    "sucursales_sin_movimientos": 20,
+    "filas_en_duplicados_de_negocio": 1000,
+    "ids_movimiento_duplicados": 0
+  },
+  "periodo_movimientos": {
+    "desde": "2025-01-01 00:00:42",
+    "hasta": "2026-07-31 23:59:54"
+  }
+}
