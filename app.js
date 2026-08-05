@@ -100,6 +100,7 @@ let conn;
 let currentResult = null;
 let currentRows = [];
 let currentColumns = [];
+let currentColumnMeta = {};
 
 function setStatus(text, type = "loading") {
   els.statusText.textContent = text;
@@ -152,20 +153,94 @@ function validateReadOnly(sql) {
 }
 
 function tableToObjects(table) {
-  const columns = table.schema.fields.map((field) => field.name);
+  const fields = table.schema.fields;
+  const columns = fields.map((field) => field.name);
+  const columnMeta = Object.fromEntries(
+    fields.map((field) => [
+      field.name,
+      {
+        typeText: String(field.type || "").toUpperCase(),
+        scale: Number.isInteger(field.type?.scale) ? field.type.scale : null,
+      },
+    ])
+  );
   const rows = table.toArray().map((row) => {
     if (typeof row.toJSON === "function") return row.toJSON();
     const obj = {};
     for (const col of columns) obj[col] = row[col];
     return obj;
   });
-  return { columns, rows };
+  return { columns, rows, columnMeta };
 }
 
-function formatValue(value) {
+function formatDateTime(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+function formatTimestamp(value) {
+  if (value instanceof Date) return formatDateTime(value);
+
+  try {
+    const raw = typeof value === "bigint" ? value : BigInt(String(value));
+    const absolute = raw < 0n ? -raw : raw;
+    let milliseconds;
+
+    // La magnitud permite reconocer segundos, milisegundos,
+    // microsegundos o nanosegundos sin depender de la versión de Arrow.
+    if (absolute < 100_000_000_000n) {
+      milliseconds = Number(raw * 1_000n);
+    } else if (absolute < 100_000_000_000_000n) {
+      milliseconds = Number(raw);
+    } else if (absolute < 100_000_000_000_000_000n) {
+      milliseconds = Number(raw / 1_000n);
+    } else {
+      milliseconds = Number(raw / 1_000_000n);
+    }
+
+    return formatDateTime(new Date(milliseconds));
+  } catch {
+    const parsed = new Date(value);
+    return formatDateTime(parsed) || String(value);
+  }
+}
+
+function formatScaledDecimal(value, scale = 2) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value.toFixed(scale) : String(value);
+  }
+
+  let raw;
+  try {
+    raw = typeof value === "bigint" ? value : BigInt(String(value));
+  } catch {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric.toFixed(scale) : String(value);
+  }
+
+  const negative = raw < 0n;
+  const digits = (negative ? -raw : raw).toString().padStart(scale + 1, "0");
+  const integerPart = digits.slice(0, -scale) || "0";
+  const decimalPart = digits.slice(-scale);
+  return `${negative ? "-" : ""}${integerPart}.${decimalPart}`;
+}
+
+function formatValue(value, meta = {}) {
   if (value === null || value === undefined) return null;
+
+  const typeText = meta.typeText || "";
+  if (typeText.includes("TIMESTAMP") || typeText === "DATE") {
+    return formatTimestamp(value);
+  }
+  if (typeText.includes("DECIMAL")) {
+    return formatScaledDecimal(value, 2);
+  }
+  if (typeText.includes("FLOAT") || typeText.includes("DOUBLE")) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric.toFixed(2) : String(value);
+  }
   if (typeof value === "bigint") return value.toString();
-  if (value instanceof Date) return value.toISOString().replace("T", " ").replace("Z", "");
+  if (value instanceof Date) return formatDateTime(value);
   if (Array.isArray(value)) return JSON.stringify(value);
   if (typeof value === "object") {
     if (typeof value.toString === "function") return value.toString();
@@ -200,7 +275,7 @@ function renderResult() {
     const tr = document.createElement("tr");
     currentColumns.forEach((column) => {
       const td = document.createElement("td");
-      const value = formatValue(row[column]);
+      const value = formatValue(row[column], currentColumnMeta[column]);
       if (value === null) {
         td.textContent = "NULL";
         td.className = "null-value";
@@ -244,6 +319,7 @@ async function executeQuery() {
     const converted = tableToObjects(currentResult);
     currentRows = converted.rows;
     currentColumns = converted.columns;
+    currentColumnMeta = converted.columnMeta;
     const elapsed = performance.now() - started;
     renderResult();
     els.exportCsvBtn.disabled = currentColumns.length === 0;
@@ -253,6 +329,7 @@ async function executeQuery() {
     currentResult = null;
     currentRows = [];
     currentColumns = [];
+    currentColumnMeta = {};
     els.exportCsvBtn.disabled = true;
     els.tableWrap.innerHTML = `<div class="empty-state"><div class="empty-icon">!</div><p>La consulta no pudo ejecutarse.</p></div>`;
     const raw = error?.message || String(error);
@@ -424,6 +501,9 @@ async function createAndLoadDatabase() {
 }
 
 async function initialize() {
+  // El editor siempre inicia vacío, incluso si el navegador intenta
+  // restaurar el contenido de una sesión anterior.
+  els.sqlEditor.value = "";
   renderExamples();
   updateEditorInfo();
   try {
@@ -461,8 +541,8 @@ async function initialize() {
 }
 
 function updateEditorInfo() {
-  const lines = els.sqlEditor.value.split("\n").length;
   const chars = els.sqlEditor.value.length;
+  const lines = chars === 0 ? 0 : els.sqlEditor.value.split("\n").length;
   els.editorInfo.textContent = `${lines} líneas · ${chars} caracteres`;
 }
 
@@ -480,15 +560,18 @@ function downloadBlob(content, filename, type) {
 
 function exportCurrentCsv() {
   if (!currentColumns.length) return;
-  const escapeCsv = (value) => {
-    const formatted = formatValue(value);
+  const escapeCsv = (value, column) => {
+    const formatted = formatValue(value, currentColumnMeta[column]);
     if (formatted === null) return "";
     const text = String(formatted);
     return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
   };
-  const lines = [currentColumns.map(escapeCsv).join(",")];
+  const lines = [currentColumns.map((column) => {
+    const text = String(column);
+    return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  }).join(",")];
   currentRows.forEach((row) => {
-    lines.push(currentColumns.map((column) => escapeCsv(row[column])).join(","));
+    lines.push(currentColumns.map((column) => escapeCsv(row[column], column)).join(","));
   });
   downloadBlob(`\ufeff${lines.join("\r\n")}`, "resultado_consulta.csv", "text/csv;charset=utf-8");
 }
@@ -512,6 +595,15 @@ els.confirmResetBtn.addEventListener("click", async () => {
   try {
     await createAndLoadDatabase();
     await renderSchema();
+    els.sqlEditor.value = "";
+    updateEditorInfo();
+    currentResult = null;
+    currentRows = [];
+    currentColumns = [];
+    currentColumnMeta = {};
+    els.exportCsvBtn.disabled = true;
+    els.resultSummary.textContent = "Ejecuta una consulta para ver los resultados.";
+    els.tableWrap.innerHTML = `<div class="empty-state"><div class="empty-icon">⌁</div><p>El resultado de la consulta se mostrará aquí.</p></div>`;
     setStatus("Laboratorio restablecido", "success");
     showMessage("Laboratorio restablecido", "Las tres tablas volvieron a su estado original.", true);
   } catch (error) {
