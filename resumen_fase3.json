@@ -1,0 +1,35 @@
+{
+  "bases_logicas": {
+    "capacitacion_sql": {
+      "productos": 3000,
+      "sucursales": 400,
+      "movimientos": 250000
+    },
+    "abastecimiento_sql": {
+      "proveedores": 150,
+      "productos_proveedor": 5000,
+      "ordenes_compra": 80000
+    }
+  },
+  "casos_controlados": {
+    "productos_sin_proveedor": 120,
+    "productos_con_varios_proveedores": 1539,
+    "proveedores_sin_ordenes": 15,
+    "costos_compra_null": 100,
+    "ordenes_costo_valor_null": 120,
+    "ordenes_producto_inexistente": 300,
+    "ordenes_proveedor_inexistente": 150,
+    "ordenes_anuladas": 3254,
+    "ordenes_pendientes": 4897
+  },
+  "casos_texto_abastecimiento": {
+    "nombre_proveedor_con_espacios_externos": 12,
+    "tipo_proveedor_en_minusculas": 10,
+    "tipo_proveedor_con_espacios_externos": 8,
+    "tipo_proveedor_null": 5,
+    "tipo_proveedor_vacio": 5,
+    "estado_proveedor_null": 4,
+    "estado_proveedor_vacio": 4
+  },
+  "version_paquete": "Fase 3 v2 - dos bases + casos de limpieza Sesión 2"
+}

@@ -144,3 +144,17 @@ dialog p { color: var(--muted); line-height: 1.5; }
   .button { flex: 1; }
   #sqlEditor { min-height: 240px; font-size: 13px; }
 }
+
+.schema-group-title {
+  margin: 16px 0 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(20, 56, 95, 0.08);
+}
+.schema-group-title:first-child {
+  margin-top: 4px;
+}

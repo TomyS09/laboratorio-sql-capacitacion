@@ -14,6 +14,7 @@ const BUNDLES = {
 
 const TABLES = [
   {
+    schema: "capacitacion_sql",
     name: "productos",
     columns: [
       ["codigo_producto", "STRING"], ["descripcion_producto", "STRING"],
@@ -23,6 +24,7 @@ const TABLES = [
     ],
   },
   {
+    schema: "capacitacion_sql",
     name: "sucursales",
     columns: [
       ["codigo_sucursal", "STRING"], ["nombre_sucursal", "STRING"],
@@ -31,6 +33,7 @@ const TABLES = [
     ],
   },
   {
+    schema: "capacitacion_sql",
     name: "movimientos",
     columns: [
       ["id_movimiento", "BIGINT"], ["fecha_movimiento", "TIMESTAMP"],
@@ -38,6 +41,37 @@ const TABLES = [
       ["tipo_movimiento", "STRING"], ["cantidad", "INT"],
       ["valor", "DECIMAL"], ["estado_movimiento", "STRING"],
       ["observacion", "STRING"],
+    ],
+  },
+  {
+    schema: "abastecimiento_sql",
+    name: "proveedores",
+    columns: [
+      ["codigo_proveedor", "STRING"], ["nombre_proveedor", "STRING"],
+      ["ciudad", "STRING"], ["provincia", "STRING"],
+      ["tipo_proveedor", "STRING"], ["dias_credito", "INT"],
+      ["estado_proveedor", "STRING"],
+    ],
+  },
+  {
+    schema: "abastecimiento_sql",
+    name: "productos_proveedor",
+    columns: [
+      ["codigo_producto", "STRING"], ["codigo_proveedor", "STRING"],
+      ["costo_compra", "DECIMAL"], ["plazo_entrega_dias", "INT"],
+      ["descuento_porcentaje", "DECIMAL"], ["proveedor_principal", "STRING"],
+      ["estado_relacion", "STRING"],
+    ],
+  },
+  {
+    schema: "abastecimiento_sql",
+    name: "ordenes_compra",
+    columns: [
+      ["id_orden", "BIGINT"], ["fecha_orden", "TIMESTAMP"],
+      ["codigo_proveedor", "STRING"], ["codigo_producto", "STRING"],
+      ["codigo_sucursal", "STRING"], ["cantidad_solicitada", "INT"],
+      ["costo_unitario", "DECIMAL"], ["valor_orden", "DECIMAL"],
+      ["estado_orden", "STRING"], ["fecha_entrega", "TIMESTAMP"],
     ],
   },
 ];
@@ -68,6 +102,22 @@ const EXAMPLES = [
     title: "Faltantes con LEFT JOIN",
     sql: `SELECT\n    m.codigo_producto,\n    COUNT(*) AS movimientos_sin_producto\nFROM capacitacion_sql.movimientos m\nLEFT JOIN capacitacion_sql.productos p\n    ON m.codigo_producto = p.codigo_producto\nWHERE p.codigo_producto IS NULL\nGROUP BY m.codigo_producto\nORDER BY movimientos_sin_producto DESC;`,
   },
+  {
+    session: "Sesión 4",
+    title: "JOIN entre bases",
+    sql: `SELECT\n    p.codigo_producto,\n    p.descripcion_producto,\n    pp.codigo_proveedor,\n    pr.nombre_proveedor,\n    pp.costo_compra\nFROM capacitacion_sql.productos p\nINNER JOIN abastecimiento_sql.productos_proveedor pp\n    ON p.codigo_producto = pp.codigo_producto\nINNER JOIN abastecimiento_sql.proveedores pr\n    ON pp.codigo_proveedor = pr.codigo_proveedor\nORDER BY pp.costo_compra DESC\nLIMIT 20;`,
+  },
+  {
+    session: "Sesión 4",
+    title: "Productos sin proveedor",
+    sql: `SELECT\n    p.codigo_producto,\n    p.descripcion_producto,\n    p.categoria\nFROM capacitacion_sql.productos p\nLEFT JOIN abastecimiento_sql.productos_proveedor pp\n    ON p.codigo_producto = pp.codigo_producto\nWHERE pp.codigo_producto IS NULL\nORDER BY p.codigo_producto;`,
+  },
+  {
+    session: "Reto",
+    title: "Cuatro tablas · dos bases",
+    sql: `SELECT\n    oc.id_orden,\n    oc.fecha_orden,\n    p.descripcion_producto,\n    pr.nombre_proveedor,\n    s.nombre_sucursal,\n    oc.cantidad_solicitada,\n    oc.valor_orden\nFROM abastecimiento_sql.ordenes_compra oc\nINNER JOIN capacitacion_sql.productos p\n    ON oc.codigo_producto = p.codigo_producto\nINNER JOIN abastecimiento_sql.proveedores pr\n    ON oc.codigo_proveedor = pr.codigo_proveedor\nINNER JOIN capacitacion_sql.sucursales s\n    ON oc.codigo_sucursal = s.codigo_sucursal\nLIMIT 20;`,
+  },
+
 ];
 
 const els = {
@@ -295,7 +345,7 @@ function beginnerHint(errorText) {
   const text = errorText.toLowerCase();
   if (text.includes("parser error")) return "Revisa el orden de las cláusulas, las comas, los paréntesis y el punto y coma.";
   if (text.includes("binder error") || text.includes("referenced column")) return "Revisa que el nombre de la columna exista y que el alias se utilice en una cláusula permitida.";
-  if (text.includes("catalog error") || text.includes("table with name")) return "Revisa que la tabla incluya el esquema capacitacion_sql y que su nombre esté correctamente escrito.";
+  if (text.includes("catalog error") || text.includes("table with name")) return "Revisa que la tabla incluya el esquema correcto (capacitacion_sql o abastecimiento_sql) y que su nombre esté correctamente escrito.";
   if (text.includes("conversion error")) return "Revisa que el tipo de dato sea compatible con la operación o el filtro.";
   return "Revisa la sintaxis y ejecuta primero una versión más pequeña de la consulta.";
 }
@@ -357,35 +407,47 @@ function renderExamples() {
 }
 
 async function renderSchema() {
-  const countsTable = await conn.query(`
-    SELECT 'productos' AS tabla, COUNT(*) AS registros FROM capacitacion_sql.productos
-    UNION ALL
-    SELECT 'sucursales', COUNT(*) FROM capacitacion_sql.sucursales
-    UNION ALL
-    SELECT 'movimientos', COUNT(*) FROM capacitacion_sql.movimientos
-  `);
-  const counts = Object.fromEntries(
-    tableToObjects(countsTable).rows.map((row) => [row.tabla, Number(row.registros)])
-  );
+  const countRows = [];
+  for (const tableInfo of TABLES) {
+    const result = await conn.query(
+      `SELECT COUNT(*) AS registros FROM ${tableInfo.schema}.${tableInfo.name}`
+    );
+    const rows = tableToObjects(result).rows;
+    countRows.push({
+      key: `${tableInfo.schema}.${tableInfo.name}`,
+      registros: Number(rows[0]?.registros || 0),
+    });
+  }
+  const counts = Object.fromEntries(countRows.map((r) => [r.key, r.registros]));
 
   els.schemaExplorer.replaceChildren();
-  TABLES.forEach((tableInfo, index) => {
-    const section = document.createElement("div");
-    section.className = `schema-table${index === 0 ? " open" : ""}`;
-    const button = document.createElement("button");
-    button.className = "schema-title";
-    button.innerHTML = `<span>${tableInfo.name}</span><small>${(counts[tableInfo.name] || 0).toLocaleString("es-EC")} filas</small>`;
-    button.addEventListener("click", () => section.classList.toggle("open"));
-    const list = document.createElement("ul");
-    list.className = "column-list";
-    tableInfo.columns.forEach(([name, type]) => {
-      const li = document.createElement("li");
-      li.innerHTML = `<span>${name}</span><span class="column-type">${type}</span>`;
-      li.addEventListener("dblclick", () => insertAtCursor(name));
-      list.appendChild(li);
+  const schemas = [...new Set(TABLES.map((t) => t.schema))];
+
+  schemas.forEach((schemaName, schemaIndex) => {
+    const schemaHeader = document.createElement("div");
+    schemaHeader.className = "schema-group-title";
+    schemaHeader.textContent = schemaName;
+    els.schemaExplorer.appendChild(schemaHeader);
+
+    TABLES.filter((t) => t.schema === schemaName).forEach((tableInfo, index) => {
+      const section = document.createElement("div");
+      section.className = `schema-table${schemaIndex === 0 && index === 0 ? " open" : ""}`;
+      const button = document.createElement("button");
+      button.className = "schema-title";
+      const key = `${tableInfo.schema}.${tableInfo.name}`;
+      button.innerHTML = `<span>${tableInfo.name}</span><small>${(counts[key] || 0).toLocaleString("es-EC")} filas</small>`;
+      button.addEventListener("click", () => section.classList.toggle("open"));
+      const list = document.createElement("ul");
+      list.className = "column-list";
+      tableInfo.columns.forEach(([name, type]) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span>${name}</span><span class="column-type">${type}</span>`;
+        li.addEventListener("dblclick", () => insertAtCursor(name));
+        list.appendChild(li);
+      });
+      section.append(button, list);
+      els.schemaExplorer.appendChild(section);
     });
-    section.append(button, list);
-    els.schemaExplorer.appendChild(section);
   });
 }
 
@@ -401,7 +463,7 @@ function insertAtCursor(text) {
 
 async function registerDataFiles() {
   const protocol = duckdb.DuckDBDataProtocol.HTTP;
-  const files = ["productos.csv.gz", "sucursales.csv.gz", "movimientos.csv.gz"];
+  const files = ["productos.csv.gz", "sucursales.csv.gz", "movimientos.csv.gz", "proveedores.csv.gz", "productos_proveedor.csv.gz", "ordenes_compra.csv.gz"];
   for (const file of files) {
     const url = new URL(`./data/${file}`, window.location.href).href;
     await db.registerFileURL(file, url, protocol, false);
@@ -411,12 +473,19 @@ async function registerDataFiles() {
 async function createAndLoadDatabase() {
   setStatus("Registrando archivos de datos…");
   await registerDataFiles();
-  setStatus("Creando tablas…");
+  setStatus("Creando bases de capacitación…");
+
   const setupStatements = [
     `CREATE SCHEMA IF NOT EXISTS capacitacion_sql`,
+    `CREATE SCHEMA IF NOT EXISTS abastecimiento_sql`,
+
+    `DROP TABLE IF EXISTS abastecimiento_sql.ordenes_compra`,
+    `DROP TABLE IF EXISTS abastecimiento_sql.productos_proveedor`,
+    `DROP TABLE IF EXISTS abastecimiento_sql.proveedores`,
     `DROP TABLE IF EXISTS capacitacion_sql.movimientos`,
     `DROP TABLE IF EXISTS capacitacion_sql.productos`,
     `DROP TABLE IF EXISTS capacitacion_sql.sucursales`,
+
     `CREATE TABLE capacitacion_sql.productos (
       codigo_producto STRING,
       descripcion_producto STRING,
@@ -445,12 +514,44 @@ async function createAndLoadDatabase() {
       estado_movimiento STRING,
       observacion STRING
     )`,
+
+    `CREATE TABLE abastecimiento_sql.proveedores (
+      codigo_proveedor STRING,
+      nombre_proveedor STRING,
+      ciudad STRING,
+      provincia STRING,
+      tipo_proveedor STRING,
+      dias_credito INT,
+      estado_proveedor STRING
+    )`,
+    `CREATE TABLE abastecimiento_sql.productos_proveedor (
+      codigo_producto STRING,
+      codigo_proveedor STRING,
+      costo_compra DECIMAL(12, 2),
+      plazo_entrega_dias INT,
+      descuento_porcentaje DECIMAL(6, 2),
+      proveedor_principal STRING,
+      estado_relacion STRING
+    )`,
+    `CREATE TABLE abastecimiento_sql.ordenes_compra (
+      id_orden BIGINT,
+      fecha_orden TIMESTAMP,
+      codigo_proveedor STRING,
+      codigo_producto STRING,
+      codigo_sucursal STRING,
+      cantidad_solicitada INT,
+      costo_unitario DECIMAL(12, 2),
+      valor_orden DECIMAL(16, 2),
+      estado_orden STRING,
+      fecha_entrega TIMESTAMP
+    )`,
   ];
+
   for (const statement of setupStatements) {
     await conn.query(statement);
   }
 
-  setStatus("Cargando productos…");
+  setStatus("Cargando capacitacion_sql.productos…");
   await conn.query(`
     INSERT INTO capacitacion_sql.productos
     SELECT
@@ -464,7 +565,7 @@ async function createAndLoadDatabase() {
     FROM read_csv_auto('productos.csv.gz', header=true, all_varchar=true, nullstr='__NULL__');
   `);
 
-  setStatus("Cargando sucursales…");
+  setStatus("Cargando capacitacion_sql.sucursales…");
   await conn.query(`
     INSERT INTO capacitacion_sql.sucursales
     SELECT
@@ -491,6 +592,51 @@ async function createAndLoadDatabase() {
       CAST(estado_movimiento AS STRING),
       CAST(observacion AS STRING)
     FROM read_csv_auto('movimientos.csv.gz', header=true, all_varchar=true, nullstr='__NULL__');
+  `);
+
+  setStatus("Cargando abastecimiento_sql.proveedores…");
+  await conn.query(`
+    INSERT INTO abastecimiento_sql.proveedores
+    SELECT
+      CAST(codigo_proveedor AS STRING),
+      CAST(nombre_proveedor AS STRING),
+      CAST(ciudad AS STRING),
+      CAST(provincia AS STRING),
+      CAST(tipo_proveedor AS STRING),
+      TRY_CAST(dias_credito AS INT),
+      CAST(estado_proveedor AS STRING)
+    FROM read_csv_auto('proveedores.csv.gz', header=true, all_varchar=true, nullstr='__NULL__');
+  `);
+
+  setStatus("Cargando 5.000 relaciones producto-proveedor…");
+  await conn.query(`
+    INSERT INTO abastecimiento_sql.productos_proveedor
+    SELECT
+      CAST(codigo_producto AS STRING),
+      CAST(codigo_proveedor AS STRING),
+      TRY_CAST(costo_compra AS DECIMAL(12, 2)),
+      TRY_CAST(plazo_entrega_dias AS INT),
+      TRY_CAST(descuento_porcentaje AS DECIMAL(6, 2)),
+      CAST(proveedor_principal AS STRING),
+      CAST(estado_relacion AS STRING)
+    FROM read_csv_auto('productos_proveedor.csv.gz', header=true, all_varchar=true, nullstr='__NULL__');
+  `);
+
+  setStatus("Cargando 80.000 órdenes de compra…");
+  await conn.query(`
+    INSERT INTO abastecimiento_sql.ordenes_compra
+    SELECT
+      TRY_CAST(id_orden AS BIGINT),
+      TRY_CAST(fecha_orden AS TIMESTAMP),
+      CAST(codigo_proveedor AS STRING),
+      CAST(codigo_producto AS STRING),
+      CAST(codigo_sucursal AS STRING),
+      TRY_CAST(cantidad_solicitada AS INT),
+      TRY_CAST(costo_unitario AS DECIMAL(12, 2)),
+      TRY_CAST(valor_orden AS DECIMAL(16, 2)),
+      CAST(estado_orden AS STRING),
+      TRY_CAST(fecha_entrega AS TIMESTAMP)
+    FROM read_csv_auto('ordenes_compra.csv.gz', header=true, all_varchar=true, nullstr='__NULL__');
   `);
 
   try {
@@ -605,7 +751,7 @@ els.confirmResetBtn.addEventListener("click", async () => {
     els.resultSummary.textContent = "Ejecuta una consulta para ver los resultados.";
     els.tableWrap.innerHTML = `<div class="empty-state"><div class="empty-icon">⌁</div><p>El resultado de la consulta se mostrará aquí.</p></div>`;
     setStatus("Laboratorio restablecido", "success");
-    showMessage("Laboratorio restablecido", "Las tres tablas volvieron a su estado original.", true);
+    showMessage("Laboratorio restablecido", "Las seis tablas de las dos bases volvieron a su estado original.", true);
   } catch (error) {
     showMessage("No fue posible restablecer", error?.message || String(error));
   } finally {
