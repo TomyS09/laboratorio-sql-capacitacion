@@ -256,25 +256,32 @@ function formatTimestamp(value) {
 }
 
 function formatScaledDecimal(value, scale = 2) {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value.toFixed(scale) : String(value);
-  }
 
-  let raw;
-  try {
-    raw = typeof value === "bigint" ? value : BigInt(String(value));
-  } catch {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric.toFixed(scale) : String(value);
-  }
+    if (scale === 0) {
+        return String(value);
+    }
 
-  const negative = raw < 0n;
-  const digits = (negative ? -raw : raw).toString().padStart(scale + 1, "0");
-  const integerPart = digits.slice(0, -scale) || "0";
-  const decimalPart = digits.slice(-scale);
-  return `${negative ? "-" : ""}${integerPart}.${decimalPart}`;
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value.toFixed(scale) : String(value);
+    }
+
+    let raw;
+
+    try {
+        raw = typeof value === "bigint" ? value : BigInt(String(value));
+    } catch {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric.toFixed(scale) : String(value);
+    }
+
+    const negative = raw < 0n;
+    const digits = (negative ? -raw : raw).toString().padStart(scale + 1, "0");
+
+    const integerPart = digits.slice(0, -scale) || "0";
+    const decimalPart = digits.slice(-scale);
+
+    return `${negative ? "-" : ""}${integerPart}.${decimalPart}`;
 }
-
 function formatValue(value, meta = {}) {
   if (value === null || value === undefined) return null;
 
