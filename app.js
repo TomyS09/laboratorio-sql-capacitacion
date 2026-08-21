@@ -282,9 +282,10 @@ function formatValue(value, meta = {}) {
   if (typeText.includes("TIMESTAMP") || typeText === "DATE") {
     return formatTimestamp(value);
   }
-  if (typeText.includes("DECIMAL")) {
-    return formatScaledDecimal(value, 2);
-  }
+if (typeText.includes("DECIMAL")) {
+    const scale = Number.isInteger(meta.scale) ? meta.scale : 0;
+    return formatScaledDecimal(value, scale);
+}
   if (typeText.includes("FLOAT") || typeText.includes("DOUBLE")) {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric.toFixed(2) : String(value);
